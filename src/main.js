@@ -151,7 +151,9 @@ async function loadData() {
 
 async function loadEntries() {
   const query = isProfessional() && state.selectedUserId ? `?userId=${state.selectedUserId}` : '';
-  state.entries = await api(`/api/mood-entries${query}`);
+  // FIX: O backend retorna um array diretamente (não mais { items, pagination }).
+  const result = await api(`/api/mood-entries${query}`);
+  state.entries = Array.isArray(result) ? result : (result?.items ?? []);
   state.summary = await api(`/api/summary${query}`);
 }
 
