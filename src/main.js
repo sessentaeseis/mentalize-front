@@ -143,7 +143,11 @@ function isProfessional() {
 }
 
 async function api(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  const headers = { ...(options.headers || {}) };
+
+  if (options.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (state.token && options.auth !== false) {
     headers.Authorization = `Bearer ${state.token}`;
