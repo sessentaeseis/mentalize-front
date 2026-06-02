@@ -2,7 +2,7 @@ import './style.css';
 import { renderCharts } from './charts.js';
 import { resolveAnalytics } from './analytics.js';
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3000');
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'https://soyuz-backend-h5md.onrender.com');
 const SESSION_KEY = 'mentalize.session';
 const THEME_KEY = 'mentalize.theme';
 const FAVORITES_KEY = 'mentalize.materials.favorites';
@@ -204,7 +204,8 @@ async function loadData() {
       : state.currentUser?.id || state.users[0]?.id || null;
     await loadEntries();
   } catch (error) {
-    state.status = 'API indisponível';
+    console.error('Erro ao carregar dados:', error);
+    state.status = `API indisponível: ${error.message || 'Verifique a conexão'}`;
     state.message = error.message;
   }
 }
