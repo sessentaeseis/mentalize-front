@@ -1,7 +1,42 @@
 import './style.css';
+import { renderCharts } from './charts.js';
+import { resolveAnalytics } from './analytics.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3000');
 const SESSION_KEY = 'mentalize.session';
+const THEME_KEY = 'mentalize.theme';
+const FAVORITES_KEY = 'mentalize.materials.favorites';
+
+const MATERIALS = [
+  {
+    id: 'respiracao-478',
+    title: 'Respiração 4-7-8',
+    category: 'Respiração',
+    excerpt: 'Uma técnica simples para reduzir ansiedade e acalmar o corpo.',
+    details: 'Inspire contando até 4, segure por 7 e expire por 8. Repita 4 vezes com atenção no ar entrando e saindo.',
+  },
+  {
+    id: 'meditacao-breve',
+    title: 'Meditação breve',
+    category: 'Meditação',
+    excerpt: 'Exercício de atenção plena para conectar corpo e mente em poucos minutos.',
+    details: 'Sente-se confortável, feche os olhos, perceba a respiração e deixe os pensamentos passarem sem julgamento.',
+  },
+  {
+    id: 'visualizacao-positiva',
+    title: 'Visualização positiva',
+    category: 'Mindfulness',
+    excerpt: 'Use imagens mentais para gerar calma e reforçar bem-estar.',
+    details: 'Imagine um lugar seguro e acolhedor, observe cores, sons e sensações, e mantenha a sensação positiva no corpo.',
+  },
+  {
+    id: 'pausa-consciente',
+    title: 'Pausa consciente',
+    category: 'Autocuidado',
+    excerpt: 'Uma pausa rápida para reconectar com o presente e aliviar o estresse.',
+    details: 'Pare por dois minutos, observe os cinco sentidos e solte qualquer cobrança enquanto o corpo relaxa.',
+  },
+];
 
 const state = {
   token: null,
@@ -17,6 +52,11 @@ const state = {
   editingProfessionalId: null,
   status: 'Conectando',
   message: '',
+  loading: false,
+  analytics: null,
+  theme: localStorage.getItem(THEME_KEY) || 'light',
+  materialsFilter: 'all',
+  favorites: new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')),
 };
 
 const app = document.querySelector('#app');
@@ -74,8 +114,28 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function saveFavorites() {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...state.favorites]));
+}
+
+function applyTheme(theme = state.theme) {
+  state.theme = theme;
+  document.body.classList.toggle('theme-dark', theme === 'dark');
+  document.body.classList.toggle('theme-light', theme !== 'dark');
+  localStorage.setItem(THEME_KEY, theme);
+  const toggleButtons = document.querySelectorAll('[data-action="toggle-theme"]');
+  toggleButtons.forEach((btn) => {
+    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    btn.title = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
+  });
+}
+
+function toggleTheme() {
+  applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+}
+
 function firstName(user = state.currentUser) {
-  return user?.preferred_name || user?.name?.split(' ')[0] || 'voce';
+  return user?.preferred_name || user?.name?.split(' ')[0] || 'você';
 }
 
 function isProfessional() {
@@ -98,7 +158,7 @@ async function api(path, options = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || 'Nao foi possivel concluir a acao.');
+    throw new Error(data.message || 'Não foi possível concluir a ação.');
   }
 
   return data;
@@ -136,7 +196,7 @@ async function loadData() {
 
   try {
     const health = await api('/health');
-    state.status = health.database === 'configured' ? 'Banco em nuvem conectado' : 'Modo demo local';
+    state.status = health.database === 'configured' ? 'PostgreSQL conectado' : 'Sem banco (apenas memória)';
     state.users = await api('/api/users');
     state.professionals = isProfessional() ? await api('/api/professionals') : [];
     state.selectedUserId = isProfessional()
@@ -144,7 +204,7 @@ async function loadData() {
       : state.currentUser?.id || state.users[0]?.id || null;
     await loadEntries();
   } catch (error) {
-    state.status = 'Backend indisponivel';
+    state.status = 'API indisponível';
     state.message = error.message;
   }
 }
@@ -155,6 +215,7 @@ async function loadEntries() {
   const result = await api(`/api/mood-entries${query}`);
   state.entries = Array.isArray(result) ? result : (result?.items ?? []);
   state.summary = await api(`/api/summary${query}`);
+  state.analytics = resolveAnalytics(state.summary, state.entries);
 }
 
 function navItem(route, label) {
@@ -184,14 +245,9 @@ function renderAuthLayout() {
       <section class="auth-visual">
         ${renderBrand()}
         <div class="auth-copy">
-          <span class="quiet-label">Plataforma de bem-estar mental</span>
-          <h1>Acompanhamento emocional claro, leve e continuo.</h1>
-          <p>Registre intensidade, contexto e padroes. Receba sugestoes adaptadas e compartilhe sua evolucao com profissionais autorizados.</p>
-        </div>
-        <div class="auth-proof">
-          <span>Check-ins guiados</span>
-          <span>CRP validado</span>
-          <span>Historico inteligente</span>
+          <span class="quiet-label">Saúde mental</span>
+          <h1>Registre como você está e acompanhe padrões ao longo do tempo.</h1>
+          <p>Check-ins rápidos, histórico visual e espaço para profissionais com CRP validado.</p>
         </div>
       </section>
 
@@ -253,12 +309,13 @@ function renderAppLayout() {
     <div class="app-shell">
       <aside class="sidebar">
         ${renderBrand()}
-        <nav class="nav-links" aria-label="Navegacao principal">
+        <nav class="nav-links" aria-label="Navegação principal">
           ${navItem('painel', 'Painel')}
           ${navItem('check-in', 'Check-in')}
-          ${navItem('historico', 'Historico')}
+          ${navItem('historico', 'Histórico')}
+          ${navItem('materiais', 'Materiais')}
           ${isProfessional() ? navItem('profissionais', 'Profissionais') : ''}
-          ${isProfessional() ? navItem('usuarios', 'Usuarios') : ''}
+          ${isProfessional() ? navItem('usuarios', 'Usuários') : ''}
           ${navItem('perfil', 'Perfil')}
         </nav>
         <div class="system-card">
@@ -273,37 +330,48 @@ function renderAppLayout() {
             <p class="quiet-label">${escapeHtml(pageEyebrow())}</p>
             <h1>${escapeHtml(pageTitle())}</h1>
           </div>
-          <div class="topbar-actions">
-            <button class="ghost-button" type="button" data-action="refresh">Atualizar</button>
-            <button class="ghost-button" type="button" data-action="logout">Sair</button>
-          </div>
+        <div class="topbar-actions">
+          <button class="ghost-button" type="button" data-action="refresh" ${state.loading ? 'disabled' : ''}>Atualizar</button>
+          <button class="ghost-button" type="button" data-action="toggle-theme" title="Alternar modo claro/escuro">${state.theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button class="ghost-button" type="button" data-action="logout">Sair</button>
+        </div>
         </header>
+        ${state.loading ? '<div class="loading-bar" role="status"><span></span> Carregando dados…</div>' : ''}
         ${renderCurrentPage()}
       </main>
+      <nav class="mobile-nav" aria-label="Menu mobile">
+        ${navItem('painel', 'Painel')}
+        ${navItem('check-in', 'Check-in')}
+        ${navItem('historico', 'Histórico')}
+        ${navItem('materiais', 'Materiais')}
+        ${navItem('perfil', 'Perfil')}
+      </nav>
     </div>
   `;
 }
 
 function pageEyebrow() {
   const labels = {
-    painel: `Ola, ${firstName()}`,
-    'check-in': 'Registro emocional',
-    historico: 'Padroes ao longo do tempo',
-    profissionais: 'Rede de cuidado',
-    usuarios: 'Acessos autorizados',
-    perfil: 'Conta e preferencias',
+    painel: `Olá, ${firstName()}`,
+    'check-in': 'Check-in',
+    historico: 'Histórico',
+    materiais: 'Materiais',
+    profissionais: 'Profissionais',
+    usuarios: 'Usuários',
+    perfil: 'Conta',
   };
   return labels[state.route] || labels.painel;
 }
 
 function pageTitle() {
   const titles = {
-    painel: 'Um painel calmo para acompanhar o que voce sente.',
-    'check-in': 'Registre contexto, intensidade e sinais do dia.',
-    historico: 'Veja registros e recorrencias com mais profundidade.',
-    profissionais: 'Cadastre e valide profissionais pelo CRP.',
-    usuarios: 'Gerencie usuarios e vinculos de acompanhamento.',
-    perfil: 'Revise seus dados e o estado da integracao.',
+    painel: 'Resumo do seu bem-estar',
+    'check-in': 'Como você está agora?',
+    historico: 'Todos os registros',
+    materiais: 'Materiais de apoio',
+    profissionais: 'Equipe de saúde mental',
+    usuarios: 'Pacientes e acessos',
+    perfil: 'Dados da conta',
   };
   return titles[state.route] || titles.painel;
 }
@@ -313,6 +381,7 @@ function renderCurrentPage() {
     painel: renderDashboard,
     'check-in': renderCheckIn,
     historico: renderHistory,
+    materiais: renderMaterialsPage,
     profissionais: renderProfessionalsPage,
     usuarios: renderUsersPage,
     perfil: renderProfile,
@@ -322,32 +391,35 @@ function renderCurrentPage() {
 
 function renderDashboard() {
   const recommendation = state.summary?.recommendation || {};
+  const analytics = state.analytics || resolveAnalytics(state.summary, state.entries);
+
   return `
-    <section class="dashboard-hero">
+    <section class="dashboard-hero dashboard-hero--light">
       <div>
-        <p class="quiet-label">Sugestao de agora</p>
-        <h2>${escapeHtml(recommendation.title || 'Comece pelo primeiro check-in')}</h2>
-        <p>${escapeHtml(recommendation.summary || 'Registre como voce esta para gerar orientacoes personalizadas.')}</p>
+        <p class="quiet-label">Sugestão</p>
+        <h2>${escapeHtml(recommendation.title || 'Primeiro check-in')}</h2>
+        <p>${escapeHtml(recommendation.summary || 'Registre humor e contexto para ver gráficos e tendências.')}</p>
       </div>
-      <div class="breathing-card" aria-label="Exercicio rapido">
-        <span>2 min</span>
-        <strong>Respirar</strong>
-        <small>Inspire por 4, segure por 4, solte por 4.</small>
-      </div>
+      <a class="breathing-card" href="#/check-in">
+        <span>Novo</span>
+        <strong>Check-in</strong>
+        <small>Leva cerca de 1 minuto</small>
+      </a>
     </section>
 
     ${renderMetrics()}
+    ${renderCharts(analytics, escapeHtml)}
 
     <section class="split-grid">
       <div class="panel">
         <div class="panel-heading">
           <div>
-            <p class="quiet-label">Proximas acoes</p>
-            <h2>Recomendacoes</h2>
+            <p class="quiet-label">Próximos passos</p>
+            <h2>Sugestões</h2>
           </div>
         </div>
         <ul class="action-list">
-          ${(recommendation.actions || ['Registrar humor de hoje', 'Adicionar contexto', 'Revisar historico'])
+          ${(recommendation.actions || ['Registrar humor de hoje', 'Adicionar contexto', 'Revisar histórico'])
             .map((action) => `<li>${escapeHtml(action)}</li>`)
             .join('')}
         </ul>
@@ -356,11 +428,11 @@ function renderDashboard() {
         <div class="panel-heading">
           <div>
             <p class="quiet-label">Recentes</p>
-            <h2>Ultimos registros</h2>
+            <h2>Últimos registros</h2>
           </div>
           <a class="text-link" href="#/historico">Ver todos</a>
         </div>
-        ${renderEntryList(state.entries.slice(0, 3))}
+        ${renderEntryList(state.entries.slice(0, 4))}
       </div>
     </section>
   `;
@@ -370,7 +442,7 @@ function renderMetrics() {
   const summary = state.summary || {};
   const items = [
     ['Registros', summary.total_entries || 0],
-    ['Intensidade media', summary.average_intensity || 0],
+    ['Intensidade média', summary.average_intensity || 0],
     ['Picos recentes', summary.high_intensity_entries || 0],
     ['Contexto frequente', summary.main_context || '--'],
   ];
@@ -452,8 +524,10 @@ function renderUserSelect(selectedId) {
 }
 
 function renderHistory() {
+  const analytics = state.analytics || resolveAnalytics(state.summary, state.entries);
   return `
     ${renderMetrics()}
+    ${renderCharts(analytics, escapeHtml)}
     <section class="panel">
       <div class="panel-heading">
         <div>
@@ -463,6 +537,47 @@ function renderHistory() {
         ${isProfessional() ? renderUserSelect(state.selectedUserId) : ''}
       </div>
       ${renderEntryList(state.entries)}
+    </section>
+  `;
+}
+
+function renderMaterialsPage() {
+  const materials = state.materialsFilter === 'favorites'
+    ? MATERIALS.filter((item) => state.favorites.has(item.id))
+    : MATERIALS;
+
+  return `
+    <section class="panel materials-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="quiet-label">Materiais</p>
+          <h2>Guias de respiração e meditação</h2>
+        </div>
+      </div>
+      <p class="materials-description">Explore práticas para acalmar, focar e equilibrar seu dia. Marque como favorito o que funcionar melhor para você.</p>
+      <div class="materials-tabs">
+        <button class="tab-button ${state.materialsFilter === 'all' ? 'active' : ''}" type="button" data-action="set-materials-tab" data-tab="all">Todos</button>
+        <button class="tab-button ${state.materialsFilter === 'favorites' ? 'active' : ''}" type="button" data-action="set-materials-tab" data-tab="favorites">Favoritos</button>
+      </div>
+      <div class="materials-grid">
+        ${materials.length ? materials.map((item) => `
+          <article class="material-card">
+            <div class="material-card-header">
+              <div>
+                <strong>${escapeHtml(item.title)}</strong>
+                <span>${escapeHtml(item.category)}</span>
+              </div>
+              <button class="favorite-button ${state.favorites.has(item.id) ? 'active' : ''}" type="button" data-action="toggle-favorite" data-id="${item.id}">
+                ${state.favorites.has(item.id) ? '★ Favorito' : '☆ Favoritar'}
+              </button>
+            </div>
+            <p class="material-excerpt">${escapeHtml(item.excerpt)}</p>
+            <p class="material-details">${escapeHtml(item.details)}</p>
+          </article>
+        `).join('') : `
+          <div class="empty-state">${state.materialsFilter === 'favorites' ? 'Nenhum favorito ainda. Marque um material como favorito para encontrá-lo aqui.' : 'Nenhum material disponível no momento.'}</div>
+        `}
+      </div>
     </section>
   `;
 }
@@ -617,12 +732,12 @@ function renderProfile() {
         <p>${escapeHtml(state.currentUser?.email || '')}</p>
       </div>
       <div class="panel">
-        <p class="quiet-label">Integracao</p>
-        <h2>Backend e banco</h2>
+        <p class="quiet-label">Integração</p>
+        <h2>API e banco</h2>
         <dl class="definition-list">
           <div><dt>API</dt><dd>${escapeHtml(API_URL)}</dd></div>
           <div><dt>Status</dt><dd>${escapeHtml(state.status)}</dd></div>
-          <div><dt>Sessao</dt><dd>${state.token ? 'Ativa' : 'Inativa'}</dd></div>
+          <div><dt>Sessão</dt><dd>${state.token ? 'Ativa' : 'Inativa'}</dd></div>
         </dl>
       </div>
     </section>
@@ -631,6 +746,8 @@ function renderProfile() {
 
 function render() {
   state.route = getRoute();
+
+  applyTheme();
 
   if (state.token && !isProfessional() && ['profissionais', 'usuarios'].includes(state.route)) {
     setRoute('painel');
@@ -654,8 +771,14 @@ function render() {
 }
 
 async function refresh() {
-  await loadData();
+  state.loading = true;
   render();
+  try {
+    await loadData();
+  } finally {
+    state.loading = false;
+    render();
+  }
 }
 
 async function handleAuthSubmit(form) {
@@ -707,7 +830,14 @@ async function handleProfessionalSubmit(form) {
 app.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.target.closest('form');
-  if (!form) return;
+  if (!form || state.loading) return;
+
+  const submitButton = form.querySelector('[type="submit"]');
+  const previousLabel = submitButton?.textContent;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Salvando…';
+  }
 
   try {
     if (['login', 'register'].includes(form.dataset.form)) await handleAuthSubmit(form);
@@ -716,6 +846,11 @@ app.addEventListener('submit', async (event) => {
     if (form.dataset.form === 'professional') await handleProfessionalSubmit(form);
   } catch (error) {
     showMessage(error.message);
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = previousLabel;
+    }
   }
 });
 
@@ -768,6 +903,23 @@ app.addEventListener('click', async (event) => {
     }
     if (action === 'cancel-entry-edit') {
       state.editingEntryId = null;
+      render();
+    }
+    if (action === 'toggle-theme') {
+      toggleTheme();
+    }
+    if (action === 'set-materials-tab') {
+      state.materialsFilter = button.dataset.tab || 'all';
+      render();
+    }
+    if (action === 'toggle-favorite') {
+      const materialId = button.dataset.id;
+      if (state.favorites.has(materialId)) {
+        state.favorites.delete(materialId);
+      } else {
+        state.favorites.add(materialId);
+      }
+      saveFavorites();
       render();
     }
     if (action === 'select-user') {
