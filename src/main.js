@@ -145,9 +145,11 @@ function isProfessional() {
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
 
-  if (state.token) {
+  if (state.token && options.auth !== false) {
     headers.Authorization = `Bearer ${state.token}`;
   }
+
+  delete options.auth;
 
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -195,7 +197,7 @@ async function loadData() {
   if (!state.token) return;
 
   try {
-    const health = await api('/health');
+    const health = await api('/health', { auth: false });
     state.status = health.database === 'configured' ? 'PostgreSQL conectado' : 'Sem banco (apenas memória)';
     state.users = await api('/api/users');
     state.professionals = isProfessional() ? await api('/api/professionals') : [];
