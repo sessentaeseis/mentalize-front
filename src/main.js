@@ -137,7 +137,7 @@ const state = {
   materialsFilter: 'all',
   favorites: new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')),
   activeExerciseId: null,
-  isPremium: localStorage.getItem('premium') === 'true',
+  isPremium: false,
 };
 
 const app = document.querySelector('#app');
@@ -303,6 +303,7 @@ async function loadData() {
     state.selectedUserId = isStaff()
       ? state.selectedUserId || state.users[0]?.id || state.currentUser?.id || null
       : state.currentUser?.id || state.users[0]?.id || null;
+    state.isPremium = state.currentUser?.isPremium || false;
     await loadEntries();
   } catch (error) {
     console.error('Erro ao carregar dados:', error);
@@ -1161,10 +1162,23 @@ app.addEventListener('click', async (event) => {
       render();
     }
     if (action === 'activate-premium') {
-      state.isPremium = true;
-      localStorage.setItem('premium', 'true');
-      showMessage('Plano Premium ativado! (Demo)');
-      render();
+      try {
+        const userId = state.currentUser?.id;
+        if (!userId) {
+          showMessage('Erro: usuário não encontrado');
+          return;
+        }
+        const updated = await api(`/api/users/${userId}/premium`, {
+          method: 'PATCH',
+          body: JSON.stringify({ isPremium: true }),
+        });
+        state.currentUser = updated;
+        state.isPremium = updated.isPremium;
+        showMessage('Plano Premium ativado! (Demo)');
+        render();
+      } catch (error) {
+        showMessage(error.message || 'Erro ao ativar plano Premium');
+      }
     }
     if (action === 'select-user') {
       state.selectedUserId = id;
