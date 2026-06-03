@@ -1,4 +1,4 @@
-import './style.css';
+﻿import './style.css';
 import { renderCharts } from './charts.js';
 import { resolveAnalytics } from './analytics.js';
 
@@ -37,6 +37,44 @@ const MATERIALS = [
     details: 'Pare por dois minutos, observe os cinco sentidos e solte qualquer cobrança enquanto o corpo relaxa.',
   },
 ];
+
+MATERIALS.push(
+  {
+    id: 'aterramento-54321',
+    title: 'Aterramento 5-4-3-2-1',
+    category: 'Mindfulness',
+    excerpt: 'Uma prática rápida para voltar ao presente quando a mente acelera.',
+    details: 'Nomeie 5 coisas que vê, 4 que sente no corpo, 3 que escuta, 2 cheiros e 1 sabor ou sensação agradável.',
+  },
+  {
+    id: 'diario-pensamentos',
+    title: 'Diário de pensamentos',
+    category: 'Reflexão',
+    excerpt: 'Separe fatos, interpretações e emoções para reduzir ruminação.',
+    details: 'Escreva a situação, o pensamento automático, a emoção sentida e uma interpretação alternativa mais equilibrada.',
+  },
+  {
+    id: 'sono-desaceleracao',
+    title: 'Ritual de desaceleração',
+    category: 'Sono',
+    excerpt: 'Uma sequência curta para preparar corpo e mente antes de dormir.',
+    details: 'Reduza luzes, deixe telas de lado, anote pendências para amanhã e faça respiração lenta por cinco minutos.',
+  },
+  {
+    id: 'autocompaixao',
+    title: 'Frase de autocompaixão',
+    category: 'Autocuidado',
+    excerpt: 'Um recurso simples para atravessar cobrança interna intensa.',
+    details: 'Reconheça o momento difícil, lembre que dificuldades fazem parte da experiência humana e diga a si mesmo algo gentil.',
+  },
+  {
+    id: 'check-corpo',
+    title: 'Check-in corporal',
+    category: 'Regulação',
+    excerpt: 'Mapeie sinais físicos antes que a tensão vire pico emocional.',
+    details: 'Percorra testa, mandíbula, peito, abdômen e mãos. Observe tensão sem julgamento e solte uma região por vez.',
+  },
+);
 
 const state = {
   token: null,
@@ -125,7 +163,7 @@ function applyTheme(theme = state.theme) {
   localStorage.setItem(THEME_KEY, theme);
   const toggleButtons = document.querySelectorAll('[data-action="toggle-theme"]');
   toggleButtons.forEach((btn) => {
-    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
     btn.title = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
   });
 }
@@ -140,6 +178,22 @@ function firstName(user = state.currentUser) {
 
 function isProfessional() {
   return state.currentUser?.role === 'professional';
+}
+
+function isAdmin() {
+  return state.currentUser?.role === 'admin';
+}
+
+function isStaff() {
+  return isProfessional() || isAdmin();
+}
+
+function roleLabel(role) {
+  return {
+    admin: 'Admin',
+    professional: 'Profissional',
+    user: 'Paciente',
+  }[role] || 'Paciente';
 }
 
 async function api(path, options = {}) {
@@ -201,11 +255,9 @@ async function loadData() {
   if (!state.token) return;
 
   try {
-    const health = await api('/health', { auth: false });
-    state.status = health.database === 'configured' ? 'PostgreSQL conectado' : 'Sem banco (apenas memória)';
     state.users = await api('/api/users');
-    state.professionals = isProfessional() ? await api('/api/professionals') : [];
-    state.selectedUserId = isProfessional()
+    state.professionals = isStaff() ? await api('/api/professionals') : [];
+    state.selectedUserId = isStaff()
       ? state.selectedUserId || state.users[0]?.id || state.currentUser?.id || null
       : state.currentUser?.id || state.users[0]?.id || null;
     await loadEntries();
@@ -217,7 +269,7 @@ async function loadData() {
 }
 
 async function loadEntries() {
-  const query = isProfessional() && state.selectedUserId ? `?userId=${state.selectedUserId}` : '';
+  const query = isStaff() && state.selectedUserId ? `?userId=${state.selectedUserId}` : '';
   // FIX: O backend retorna um array diretamente (não mais { items, pagination }).
   const result = await api(`/api/mood-entries${query}`);
   state.entries = Array.isArray(result) ? result : (result?.items ?? []);
@@ -298,15 +350,15 @@ function renderRegisterForm() {
         <label>Senha<input name="password" type="password" minlength="6" autocomplete="new-password" required /></label>
         <label class="span-2">Tipo de conta
           <select name="role" data-role-select>
-            <option value="user">Usuario</option>
-            <option value="professional">Profissional de saude mental</option>
+            <option value="user">Usuário</option>
+            <option value="professional">Profissional de saúde mental</option>
           </select>
         </label>
         <label data-professional-field hidden>CRP<input name="crp" placeholder="06/123456" /></label>
         <label data-professional-field hidden>Especialidade<input name="specialty" placeholder="Psicologia clinica" /></label>
       </div>
       <button class="primary-button" type="submit">Criar conta</button>
-      <p class="form-note">Ja tem conta? <a href="#/login">Entrar agora</a>.</p>
+      <p class="form-note">Já tem conta? <a href="#/login">Entrar agora</a>.</p>
     </form>
   `;
 }
@@ -321,14 +373,10 @@ function renderAppLayout() {
           ${navItem('check-in', 'Check-in')}
           ${navItem('historico', 'Histórico')}
           ${navItem('materiais', 'Materiais')}
-          ${isProfessional() ? navItem('profissionais', 'Profissionais') : ''}
-          ${isProfessional() ? navItem('usuarios', 'Usuários') : ''}
+          ${isStaff() ? navItem('profissionais', 'Profissionais') : ''}
+          ${isStaff() ? navItem('usuarios', 'Usuários') : ''}
           ${navItem('perfil', 'Perfil')}
         </nav>
-        <div class="system-card">
-          <span class="status-dot ${state.status.includes('indisponivel') ? 'offline' : ''}" aria-hidden="true"></span>
-          <span>${escapeHtml(state.status)}</span>
-        </div>
       </aside>
 
       <main class="content">
@@ -339,11 +387,11 @@ function renderAppLayout() {
           </div>
         <div class="topbar-actions">
           <button class="ghost-button" type="button" data-action="refresh" ${state.loading ? 'disabled' : ''}>Atualizar</button>
-          <button class="ghost-button" type="button" data-action="toggle-theme" title="Alternar modo claro/escuro">${state.theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button class="ghost-button" type="button" data-action="toggle-theme" title="Alternar modo claro/escuro">${state.theme === 'dark' ? '☀️' : '🌙'}</button>
           <button class="ghost-button" type="button" data-action="logout">Sair</button>
         </div>
         </header>
-        ${state.loading ? '<div class="loading-bar" role="status"><span></span> Carregando dados…</div>' : ''}
+        ${state.loading ? '<div class="loading-bar" role="status"><span></span> Carregando dadosâ€¦</div>' : ''}
         ${renderCurrentPage()}
       </main>
       <nav class="mobile-nav" aria-label="Menu mobile">
@@ -479,8 +527,8 @@ function renderCheckIn() {
           ${editing ? '<button class="text-button" type="button" data-action="cancel-entry-edit">Cancelar</button>' : ''}
         </div>
         <form class="form-grid" data-form="entry">
-          <label>Usuario${renderUserSelect(editing?.user_id)}</label>
-          <label>Emocao
+          <label>Usuário${renderUserSelect(editing?.user_id)}</label>
+          <label>Emoção
             <select name="emotion" required>
               ${['Ansiedade', 'Estresse', 'Tristeza', 'Calma', 'Alegria', 'Cansaco'].map((emotion) => (
                 `<option value="${emotion}" ${editing?.emotion === emotion ? 'selected' : ''}>${emotion}</option>`
@@ -501,9 +549,9 @@ function renderCheckIn() {
       <aside class="panel support-panel">
         <p class="quiet-label">Exercicios guiados</p>
         <div class="exercise-list">
-          <article><strong>Respiracao quadrada</strong><span>4 ciclos para reduzir ativacao.</span></article>
-          <article><strong>Nomear para organizar</strong><span>Diferencie emocao, pensamento e fato.</span></article>
-          <article><strong>Micro-habito</strong><span>Escolha uma acao de 5 minutos.</span></article>
+          <article><strong>Respiração quadrada</strong><span>4 ciclos para reduzir ativação.</span></article>
+          <article><strong>Nomear para organizar</strong><span>Diferencie emoção, pensamento e fato.</span></article>
+          <article><strong>Micro-hábito</strong><span>Escolha uma ação de 5 minutos.</span></article>
         </div>
       </aside>
     </section>
@@ -511,7 +559,7 @@ function renderCheckIn() {
 }
 
 function renderUserSelect(selectedId) {
-  if (!isProfessional()) {
+  if (!isStaff()) {
     const user = state.currentUser || state.users[0];
     return `
       <input type="hidden" name="user_id" value="${escapeHtml(user?.id || '')}" />
@@ -541,7 +589,7 @@ function renderHistory() {
           <p class="quiet-label">Linha do tempo</p>
           <h2>Registros emocionais</h2>
         </div>
-        ${isProfessional() ? renderUserSelect(state.selectedUserId) : ''}
+        ${isStaff() ? renderUserSelect(state.selectedUserId) : ''}
       </div>
       ${renderEntryList(state.entries)}
     </section>
@@ -575,7 +623,7 @@ function renderMaterialsPage() {
                 <span>${escapeHtml(item.category)}</span>
               </div>
               <button class="favorite-button ${state.favorites.has(item.id) ? 'active' : ''}" type="button" data-action="toggle-favorite" data-id="${item.id}">
-                ${state.favorites.has(item.id) ? '★ Favorito' : '☆ Favoritar'}
+                ${state.favorites.has(item.id) ? 'â˜… Favorito' : 'â˜† Favoritar'}
               </button>
             </div>
             <p class="material-excerpt">${escapeHtml(item.excerpt)}</p>
@@ -602,7 +650,7 @@ function renderEntryList(entries) {
           <div>
             <span class="pill">${escapeHtml(entry.emotion)}</span>
             <h3>${escapeHtml(entry.context || 'Sem contexto')}</h3>
-            <p>${escapeHtml(entry.notes || 'Sem observacoes.')}</p>
+            <p>${escapeHtml(entry.notes || 'Sem observações.')}</p>
             <small>${formatDate(entry.created_at)} · intensidade ${entry.intensity}/10</small>
           </div>
           <div class="item-actions">
@@ -660,7 +708,7 @@ function renderProfessionalList() {
         <article class="list-row">
           <div>
             <strong>${escapeHtml(professional.name)}</strong>
-            <span>${escapeHtml(professional.specialty || 'Especialidade nao informada')}</span>
+            <span>${escapeHtml(professional.specialty || 'Especialidade não informada')}</span>
             <small>CRP ${escapeHtml(professional.crp)} · ${professional.verified ? 'validado' : 'pendente'}</small>
           </div>
           <div class="item-actions">
@@ -680,7 +728,7 @@ function renderUsersPage() {
       <div class="panel">
         <div class="panel-heading">
           <div>
-            <p class="quiet-label">Usuario</p>
+            <p class="quiet-label">Usuário</p>
             <h2>${editing ? 'Editar usuario' : 'Novo usuario'}</h2>
           </div>
           ${editing ? '<button class="text-button" type="button" data-action="cancel-user-edit">Cancelar</button>' : ''}
@@ -697,7 +745,7 @@ function renderUsersPage() {
         <div class="panel-heading">
           <div>
             <p class="quiet-label">Acompanhamento</p>
-            <h2>Usuarios autorizados</h2>
+            <h2>Usuários autorizados</h2>
           </div>
         </div>
         ${renderUserList()}
@@ -708,7 +756,7 @@ function renderUsersPage() {
 
 function renderUserList() {
   if (!state.users.length) {
-    return '<p class="empty-state">Nenhum usuario cadastrado.</p>';
+    return '<p class="empty-state">Nenhum usuário cadastrado.</p>';
   }
 
   return `
@@ -756,7 +804,7 @@ function render() {
 
   applyTheme();
 
-  if (state.token && !isProfessional() && ['profissionais', 'usuarios'].includes(state.route)) {
+  if (state.token && !isStaff() && ['profissionais', 'usuarios'].includes(state.route)) {
     setRoute('painel');
     return;
   }
@@ -818,7 +866,7 @@ async function handleUserSubmit(form) {
   state.selectedUserId = saved.id;
   state.editingUserId = null;
   await refresh();
-  showMessage('Usuario salvo.');
+  showMessage('Usuário salvo.');
 }
 
 async function handleProfessionalSubmit(form) {
