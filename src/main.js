@@ -76,6 +76,47 @@ MATERIALS.push(
   },
 );
 
+const EXERCISES = [
+  {
+    id: 'respiracao-quadrada',
+    title: 'Respiração quadrada',
+    subtitle: '4 ciclos para reduzir ativação.',
+    steps: [
+      'Sente-se com a coluna ereta e feche os olhos.',
+      'Inspire pelo nariz contando 4 segundos.',
+      'Segure o ar por 4 segundos.',
+      'Expire pela boca contando 4 segundos.',
+      'Aguarde 4 segundos antes de inspirar novamente.',
+      'Repita o ciclo por 4 vezes.',
+    ],
+  },
+  {
+    id: 'nomear-emocao',
+    title: 'Nomear para organizar',
+    subtitle: 'Diferencie emoção, pensamento e fato.',
+    steps: [
+      'Pause por um momento e observe como você está.',
+      'Identifique o que aconteceu (o fato): "Meu chefe me criticou na reunião."',
+      'Identifique o pensamento automático: "Sou incompetente."',
+      'Nomeie a emoção: "Estou sentindo vergonha e raiva."',
+      'Pergunte: esse pensamento é um fato ou uma interpretação?',
+      'Escreva uma versão mais equilibrada do pensamento.',
+    ],
+  },
+  {
+    id: 'micro-habito',
+    title: 'Micro-hábito',
+    subtitle: 'Escolha uma ação de 5 minutos.',
+    steps: [
+      'Pense em uma coisa pequena que faria você se sentir melhor agora.',
+      'Deve ser algo que caiba em 5 minutos ou menos.',
+      'Exemplos: beber um copo d\'água, alongar o pescoço, mandar mensagem para alguém.',
+      'Faça agora, antes de fechar esta tela.',
+      'Depois registre seu humor novamente e observe se mudou.',
+    ],
+  },
+];
+
 const state = {
   token: null,
   currentUser: null,
@@ -95,6 +136,7 @@ const state = {
   theme: localStorage.getItem(THEME_KEY) || 'light',
   materialsFilter: 'all',
   favorites: new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')),
+  activeExerciseId: null,
 };
 
 const app = document.querySelector('#app');
@@ -163,7 +205,7 @@ function applyTheme(theme = state.theme) {
   localStorage.setItem(THEME_KEY, theme);
   const toggleButtons = document.querySelectorAll('[data-action="toggle-theme"]');
   toggleButtons.forEach((btn) => {
-    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
     btn.title = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
   });
 }
@@ -277,9 +319,12 @@ async function loadEntries() {
   state.analytics = resolveAnalytics(state.summary, state.entries);
 }
 
-function navItem(route, label) {
+function navItem(route, label, icon) {
   const active = state.route === route ? ' aria-current="page"' : '';
-  return `<a href="#/${route}"${active}>${label}</a>`;
+  const iconSvg = icon
+    ? `<svg class="nav-icon" aria-hidden="true"><use href="/icons.svg#${icon}"/></svg>`
+    : '';
+  return `<a href="#/${route}"${active}>${iconSvg}<span>${label}</span></a>`;
 }
 
 function renderBrand() {
@@ -369,29 +414,33 @@ function renderAppLayout() {
       <aside class="sidebar">
         ${renderBrand()}
         <nav class="nav-links" aria-label="Navegação principal">
-          ${navItem('painel', 'Painel')}
-          ${navItem('check-in', 'Check-in')}
-          ${navItem('historico', 'Histórico')}
-          ${navItem('materiais', 'Materiais')}
-          ${isStaff() ? navItem('profissionais', 'Profissionais') : ''}
-          ${isStaff() ? navItem('usuarios', 'Usuários') : ''}
-          ${navItem('perfil', 'Perfil')}
+          ${navItem('painel', 'Painel', 'home')}
+          ${navItem('check-in', 'Check-in', 'plus-circle')}
+          ${navItem('historico', 'Histórico', 'clock')}
+          ${navItem('materiais', 'Materiais', 'book-open')}
+          ${isStaff() ? navItem('profissionais', 'Profissionais', 'users') : ''}
+          ${isStaff() ? navItem('usuarios', 'Usuários', 'user') : ''}
+          ${navItem('perfil', 'Perfil', 'settings')}
         </nav>
       </aside>
 
       <main class="content">
         <header class="topbar">
-          <div>
-            <p class="quiet-label">${escapeHtml(pageEyebrow())}</p>
-            <h1>${escapeHtml(pageTitle())}</h1>
-          </div>
+        <div>
+          <p class="quiet-label">${escapeHtml(pageEyebrow())}</p>
+          <h1>${escapeHtml(pageTitle())}</h1>
+        </div>
         <div class="topbar-actions">
           <button class="ghost-button" type="button" data-action="refresh" ${state.loading ? 'disabled' : ''}>Atualizar</button>
-          <button class="ghost-button" type="button" data-action="toggle-theme" title="Alternar modo claro/escuro">${state.theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button class="ghost-button" type="button" data-action="toggle-theme" title="Alternar modo claro/escuro">${state.theme === 'dark' ? '☀️' : '🌙'}</button>
+          <div class="topbar-user" data-action="goto-perfil" title="Ir para perfil">
+            <div class="topbar-avatar">${escapeHtml(firstName().slice(0, 1).toUpperCase())}</div>
+            <span class="topbar-name">${escapeHtml(firstName())}</span>
+          </div>
           <button class="ghost-button" type="button" data-action="logout">Sair</button>
         </div>
-        </header>
-        ${state.loading ? '<div class="loading-bar" role="status"><span></span> Carregando dadosâ€¦</div>' : ''}
+      </header>
+        ${state.loading ? '<div class="loading-bar" role="status"><span></span> Carregando dados…</div>' : ''}
         ${renderCurrentPage()}
       </main>
       <nav class="mobile-nav" aria-label="Menu mobile">
@@ -406,8 +455,9 @@ function renderAppLayout() {
 }
 
 function pageEyebrow() {
+  const greetings = contextualGreeting();
   const labels = {
-    painel: `Olá, ${firstName()}`,
+    painel: greetings,
     'check-in': 'Check-in',
     historico: 'Histórico',
     materiais: 'Materiais',
@@ -418,9 +468,22 @@ function pageEyebrow() {
   return labels[state.route] || labels.painel;
 }
 
+function contextualGreeting() {
+  const name = firstName();
+  const hour = new Date().getHours();
+  const day  = new Date().getDay();
+
+  if (hour >= 5  && hour < 12) return `Bom dia, ${name} ☀️`;
+  if (hour >= 12 && hour < 18) return `Boa tarde, ${name}`;
+  if (hour >= 18 && hour < 23) return `Boa noite, ${name} 🌙`;
+
+  if (day === 0 || day === 6) return `Curtindo o fim de semana, ${name}?`;
+  return `Ainda acordado, ${name}?`;
+}
+
 function pageTitle() {
   const titles = {
-    painel: 'Resumo do seu bem-estar',
+    painel: dashboardTitle(),
     'check-in': 'Como você está agora?',
     historico: 'Todos os registros',
     materiais: 'Materiais de apoio',
@@ -429,6 +492,16 @@ function pageTitle() {
     perfil: 'Dados da conta',
   };
   return titles[state.route] || titles.painel;
+}
+
+function dashboardTitle() {
+  const total = state.summary?.total_entries || 0;
+  if (total === 0) return 'Vamos começar?';
+  if (total < 5)  return 'Continue registrando';
+  const avg = state.summary?.average_intensity || 0;
+  if (avg >= 7)   return 'Atenção ao seu estado';
+  if (avg <= 3)   return 'Você está bem 👌';
+  return 'Resumo do seu bem-estar';
 }
 
 function renderCurrentPage() {
@@ -542,19 +615,41 @@ function renderCheckIn() {
           <label>Contexto<input name="context" value="${escapeHtml(editing?.context || '')}" placeholder="Trabalho, estudos, familia" /></label>
           <label class="span-2">Gatilhos<input name="triggers" value="${escapeHtml((editing?.triggers || []).join(', '))}" placeholder="prazos, sono, conflito" /></label>
           <label class="span-2">Observacoes<textarea name="notes" rows="4" placeholder="O que aconteceu antes, durante e depois?">${escapeHtml(editing?.notes || '')}</textarea></label>
-          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edicao' : 'Salvar registro'}</button>
+          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edição' : 'Salvar registro'}</button>
         </form>
       </div>
 
       <aside class="panel support-panel">
-        <p class="quiet-label">Exercicios guiados</p>
+        <p class="quiet-label">Exercícios guiados</p>
         <div class="exercise-list">
-          <article><strong>Respiração quadrada</strong><span>4 ciclos para reduzir ativação.</span></article>
-          <article><strong>Nomear para organizar</strong><span>Diferencie emoção, pensamento e fato.</span></article>
-          <article><strong>Micro-hábito</strong><span>Escolha uma ação de 5 minutos.</span></article>
+          ${EXERCISES.map((ex) => `
+            <article class="exercise-card" data-action="open-exercise" data-id="${ex.id}" tabindex="0" role="button">
+              <strong>${escapeHtml(ex.title)}</strong>
+              <span>${escapeHtml(ex.subtitle)}</span>
+              <small class="exercise-cta">Iniciar →</small>
+            </article>
+          `).join('')}
         </div>
+        ${state.activeExerciseId ? renderExerciseModal() : ''}
       </aside>
     </section>
+  `;
+}
+
+function renderExerciseModal() {
+  const ex = EXERCISES.find((e) => e.id === state.activeExerciseId);
+  if (!ex) return '';
+  return `
+    <div class="exercise-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(ex.title)}">
+      <div class="exercise-modal-inner">
+        <button class="modal-close" type="button" data-action="close-exercise" aria-label="Fechar">×</button>
+        <p class="quiet-label">Exercício</p>
+        <h3>${escapeHtml(ex.title)}</h3>
+        <ol class="exercise-steps">
+          ${ex.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
+        </ol>
+      </div>
+    </div>
   `;
 }
 
@@ -623,7 +718,7 @@ function renderMaterialsPage() {
                 <span>${escapeHtml(item.category)}</span>
               </div>
               <button class="favorite-button ${state.favorites.has(item.id) ? 'active' : ''}" type="button" data-action="toggle-favorite" data-id="${item.id}">
-                ${state.favorites.has(item.id) ? 'â˜… Favorito' : 'â˜† Favoritar'}
+                ${state.favorites.has(item.id) ? '★ Favorito' : '☆ Favoritar'}
               </button>
             </div>
             <p class="material-excerpt">${escapeHtml(item.excerpt)}</p>
@@ -655,7 +750,7 @@ function renderEntryList(entries) {
           </div>
           <div class="item-actions">
             <button type="button" data-action="edit-entry" data-id="${entry.id}">Editar</button>
-            <button type="button" data-action="delete-entry" data-id="${entry.id}">Excluir</button>
+            ${isAdmin() ? `<button type="button" data-action="delete-entry" data-id="${entry.id}">Excluir</button>` : ''}
           </div>
         </article>
       `).join('')}
@@ -680,7 +775,7 @@ function renderProfessionalsPage() {
           <label>CRP<input name="crp" value="${escapeHtml(editing?.crp || '')}" placeholder="06/123456" required /></label>
           <label>Especialidade<input name="specialty" value="${escapeHtml(editing?.specialty || '')}" /></label>
           <label>Email<input name="email" type="email" value="${escapeHtml(editing?.email || '')}" required /></label>
-          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edicao' : 'Salvar profissional'}</button>
+          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edição' : 'Salvar profissional'}</button>
         </form>
       </div>
 
@@ -713,7 +808,7 @@ function renderProfessionalList() {
           </div>
           <div class="item-actions">
             <button type="button" data-action="edit-professional" data-id="${professional.id}">Editar</button>
-            <button type="button" data-action="delete-professional" data-id="${professional.id}">Excluir</button>
+            ${isAdmin() ? `<button type="button" data-action="delete-professional" data-id="${professional.id}">Excluir</button>` : ''}
           </div>
         </article>
       `).join('')}
@@ -729,7 +824,7 @@ function renderUsersPage() {
         <div class="panel-heading">
           <div>
             <p class="quiet-label">Usuário</p>
-            <h2>${editing ? 'Editar usuario' : 'Novo usuario'}</h2>
+            <h2>${editing ? 'Editar usuário' : 'Novo usuário'}</h2>
           </div>
           ${editing ? '<button class="text-button" type="button" data-action="cancel-user-edit">Cancelar</button>' : ''}
         </div>
@@ -737,7 +832,7 @@ function renderUsersPage() {
           <label>Nome<input name="name" value="${escapeHtml(editing?.name || '')}" required /></label>
           <label>Como prefere ser chamado<input name="preferred_name" value="${escapeHtml(editing?.preferred_name || '')}" /></label>
           <label class="span-2">Email<input name="email" type="email" value="${escapeHtml(editing?.email || '')}" required /></label>
-          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edicao' : 'Salvar usuario'}</button>
+          <button class="primary-button span-2" type="submit">${editing ? 'Salvar edição' : 'Salvar usuário'}</button>
         </form>
       </div>
 
@@ -766,11 +861,19 @@ function renderUserList() {
           <div>
             <strong>${escapeHtml(user.preferred_name || user.name)}</strong>
             <span>${escapeHtml(user.email)}</span>
+            <small class="pill pill--${user.role}">${roleLabel(user.role)}</small>
           </div>
           <div class="item-actions">
             <button type="button" data-action="select-user" data-id="${user.id}">Ver</button>
             <button type="button" data-action="edit-user" data-id="${user.id}">Editar</button>
-            <button type="button" data-action="delete-user" data-id="${user.id}">Excluir</button>
+            ${isAdmin() ? `
+              <select data-action="change-role" data-id="${user.id}" class="role-select">
+                <option value="user"     ${user.role === 'user'         ? 'selected' : ''}>Paciente</option>
+                <option value="professional" ${user.role === 'professional' ? 'selected' : ''}>Profissional</option>
+                <option value="admin"    ${user.role === 'admin'        ? 'selected' : ''}>Admin</option>
+              </select>
+              <button type="button" data-action="delete-user" data-id="${user.id}">Excluir</button>
+            ` : ''}
           </div>
         </article>
       `).join('')}
@@ -785,13 +888,15 @@ function renderProfile() {
         <div class="avatar">${escapeHtml(firstName().slice(0, 1).toUpperCase())}</div>
         <h2>${escapeHtml(state.currentUser?.name || '')}</h2>
         <p>${escapeHtml(state.currentUser?.email || '')}</p>
+        <p class="quiet-label">${roleLabel(state.currentUser?.role)}</p>
       </div>
       <div class="panel">
-        <p class="quiet-label">Integração</p>
-        <h2>API e banco</h2>
+        <p class="quiet-label">Conta</p>
+        <h2>Informações</h2>
         <dl class="definition-list">
-          <div><dt>API</dt><dd>${escapeHtml(API_URL)}</dd></div>
-          <div><dt>Status</dt><dd>${escapeHtml(state.status)}</dd></div>
+          <div><dt>Nome preferido</dt><dd>${escapeHtml(state.currentUser?.preferred_name || state.currentUser?.name || '—')}</dd></div>
+          <div><dt>Email</dt><dd>${escapeHtml(state.currentUser?.email || '—')}</dd></div>
+          <div><dt>Perfil</dt><dd>${roleLabel(state.currentUser?.role)}</dd></div>
           <div><dt>Sessão</dt><dd>${state.token ? 'Ativa' : 'Inativa'}</dd></div>
         </dl>
       </div>
@@ -924,13 +1029,29 @@ app.addEventListener('input', (event) => {
 });
 
 app.addEventListener('change', async (event) => {
-  if (!event.target.matches('[data-user-select]')) return;
+  if (event.target.matches('[data-user-select]')) {
+    state.selectedUserId = Number(event.target.value);
+    try {
+      await refresh();
+    } catch (error) {
+      showMessage(error.message);
+    }
+  }
 
-  state.selectedUserId = Number(event.target.value);
-  try {
-    await refresh();
-  } catch (error) {
-    showMessage(error.message);
+  if (event.target.matches('[data-action="change-role"]')) {
+    const userId = Number(event.target.dataset.id);
+    const newRole = event.target.value;
+    try {
+      await api(`/api/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: newRole }),
+      });
+      await refresh();
+      showMessage(`Role atualizado para ${roleLabel(newRole)}.`);
+    } catch (error) {
+      showMessage(error.message);
+      await refresh();
+    }
   }
 });
 
@@ -943,6 +1064,9 @@ app.addEventListener('click', async (event) => {
 
   try {
     if (action === 'refresh') await refresh();
+    if (action === 'goto-perfil') {
+      setRoute('perfil');
+    }
     if (action === 'logout') {
       await api('/api/auth/logout', { method: 'POST' }).catch(() => null);
       clearSession();
@@ -962,6 +1086,14 @@ app.addEventListener('click', async (event) => {
     }
     if (action === 'toggle-theme') {
       toggleTheme();
+    }
+    if (action === 'open-exercise') {
+      state.activeExerciseId = button.dataset.id;
+      render();
+    }
+    if (action === 'close-exercise') {
+      state.activeExerciseId = null;
+      render();
     }
     if (action === 'set-materials-tab') {
       state.materialsFilter = button.dataset.tab || 'all';
