@@ -323,8 +323,10 @@ async function loadEntries() {
 
 function navItem(route, label, icon) {
   const active = state.route === route ? ' aria-current="page"' : '';
-  const iconEl = icon ? `<span class="nav-icon" aria-hidden="true">${icon}</span>` : '';
-  return `<a href="#/${route}"${active}>${iconEl}<span>${label}</span></a>`;
+  const iconSvg = icon
+    ? `<svg class="nav-icon" aria-hidden="true"><use href="/icons.svg#${icon}"/></svg>`
+    : '';
+  return `<a href="#/${route}"${active}>${iconSvg}<span>${label}</span></a>`;
 }
 
 function renderBrand() {
@@ -414,13 +416,13 @@ function renderAppLayout() {
       <aside class="sidebar">
         ${renderBrand()}
         <nav class="nav-links" aria-label="Navegação principal">
-          ${navItem('painel', 'Painel', '🏠')}
-          ${navItem('check-in', 'Check-in', '➕')}
-          ${navItem('historico', 'Histórico', '🕐')}
-          ${navItem('materiais', 'Materiais', '📖')}
-          ${isStaff() ? navItem('profissionais', 'Profissionais', '👥') : ''}
-          ${isStaff() ? navItem('usuarios', 'Usuários', '👤') : ''}
-          ${navItem('perfil', 'Perfil', '⚙️')}
+          ${navItem('painel', 'Painel', 'home')}
+          ${navItem('check-in', 'Check-in', 'plus-circle')}
+          ${navItem('historico', 'Histórico', 'clock')}
+          ${navItem('materiais', 'Materiais', 'book-open')}
+          ${isStaff() ? navItem('profissionais', 'Profissionais', 'users') : ''}
+          ${isAdmin() ? navItem('usuarios', 'Usuários', '👤') : ''}
+          ${navItem('perfil', 'Perfil', 'settings')}
         </nav>
       </aside>
 
@@ -456,15 +458,15 @@ function renderAppLayout() {
 
 function pageEyebrow() {
   const greetings = contextualGreeting();
-  const labels = {
-    painel: greetings,
-    'check-in': 'Check-in',
-    historico: 'Histórico',
-    materiais: 'Materiais',
-    profissionais: 'Profissionais',
-    usuarios: 'Usuários',
-    perfil: 'Conta',
-  };
+  if (isAdmin()) {
+    const labels = { painel: 'Administração', 'check-in': 'Check-in', historico: 'Histórico', materiais: 'Materiais', profissionais: 'Equipe', usuarios: 'Gestão de acessos', perfil: 'Conta' };
+    return labels[state.route] || labels.painel;
+  }
+  if (isProfessional()) {
+    const labels = { painel: 'Acompanhamento clínico', 'check-in': 'Registro de sessão', historico: 'Histórico do paciente', materiais: 'Materiais', profissionais: 'Equipe', perfil: 'Conta' };
+    return labels[state.route] || labels.painel;
+  }
+  const labels = { painel: greetings, 'check-in': 'Check-in', historico: 'Histórico', materiais: 'Materiais', perfil: 'Conta' };
   return labels[state.route] || labels.painel;
 }
 
@@ -482,15 +484,17 @@ function contextualGreeting() {
 }
 
 function pageTitle() {
-  const titles = {
-    painel: dashboardTitle(),
-    'check-in': 'Como você está agora?',
-    historico: 'Todos os registros',
-    materiais: 'Materiais de apoio',
-    profissionais: 'Equipe de saúde mental',
-    usuarios: 'Pacientes e acessos',
-    perfil: 'Dados da conta',
-  };
+  if (isAdmin()) {
+    const titles = { painel: adminDashboardTitle(), 'check-in': 'Novo registro', historico: 'Histórico do sistema', materiais: 'Materiais de apoio', profissionais: 'Profissionais cadastrados', usuarios: 'Usuários e permissões', perfil: 'Dados da conta' };
+    return titles[state.route] || titles.painel;
+  }
+  if (isProfessional()) {
+    const sel = state.users.find((u) => u.id === state.selectedUserId);
+    const nm = escapeHtml(sel?.preferred_name || sel?.name || 'Paciente');
+    const titles = { painel: `Painel de ${nm}`, 'check-in': 'Registrar evolução', historico: `Histórico de ${nm}`, materiais: 'Materiais de apoio', profissionais: 'Equipe de saúde mental', perfil: 'Dados da conta' };
+    return titles[state.route] || titles.painel;
+  }
+  const titles = { painel: dashboardTitle(), 'check-in': 'Como você está agora?', historico: 'Todos os registros', materiais: 'Materiais de apoio', perfil: 'Dados da conta' };
   return titles[state.route] || titles.painel;
 }
 
@@ -502,6 +506,13 @@ function dashboardTitle() {
   if (avg >= 7)   return 'Atenção ao seu estado';
   if (avg <= 3)   return 'Você está bem 👌';
   return 'Resumo do seu bem-estar';
+}
+
+function adminDashboardTitle() {
+  const total = state.users?.length || 0;
+  const profs = state.professionals?.length || 0;
+  if (total === 0) return 'Sistema vazio';
+  return `${total} usuário${total !== 1 ? 's' : ''} · ${profs} profissional${profs !== 1 ? 'is' : ''}`;
 }
 
 function renderCurrentPage() {
@@ -518,9 +529,14 @@ function renderCurrentPage() {
 }
 
 function renderDashboard() {
+  if (isAdmin())        return renderAdminDashboard();
+  if (isProfessional()) return renderProfessionalDashboard();
+  return renderPatientDashboard();
+}
+
+function renderPatientDashboard() {
   const recommendation = state.summary?.recommendation || {};
   const analytics = state.analytics || resolveAnalytics(state.summary, state.entries);
-
   return `
     <section class="dashboard-hero dashboard-hero--light">
       <div>
@@ -534,33 +550,104 @@ function renderDashboard() {
         <small>Leva cerca de 1 minuto</small>
       </a>
     </section>
-
     ${renderMetrics()}
     ${renderCharts(analytics, escapeHtml)}
-
     <section class="split-grid">
       <div class="panel">
         <div class="panel-heading">
-          <div>
-            <p class="quiet-label">Próximos passos</p>
-            <h2>Sugestões</h2>
-          </div>
+          <div><p class="quiet-label">Próximos passos</p><h2>Sugestões</h2></div>
         </div>
         <ul class="action-list">
           ${(recommendation.actions || ['Registrar humor de hoje', 'Adicionar contexto', 'Revisar histórico'])
-            .map((action) => `<li>${escapeHtml(action)}</li>`)
-            .join('')}
+            .map((action) => `<li>${escapeHtml(action)}</li>`).join('')}
         </ul>
       </div>
       <div class="panel">
         <div class="panel-heading">
-          <div>
-            <p class="quiet-label">Recentes</p>
-            <h2>Últimos registros</h2>
-          </div>
+          <div><p class="quiet-label">Recentes</p><h2>Últimos registros</h2></div>
           <a class="text-link" href="#/historico">Ver todos</a>
         </div>
         ${renderEntryList(state.entries.slice(0, 4))}
+      </div>
+    </section>
+  `;
+}
+
+function renderProfessionalDashboard() {
+  const analytics = state.analytics || resolveAnalytics(state.summary, state.entries);
+  const sel = state.users.find((u) => u.id === state.selectedUserId);
+  const patientName = sel?.preferred_name || sel?.name || 'Nenhum paciente selecionado';
+  return `
+    <section class="dashboard-hero dashboard-hero--professional">
+      <div>
+        <p class="quiet-label">Paciente em foco</p>
+        <h2>${escapeHtml(patientName)}</h2>
+        <p>${escapeHtml(sel?.email || 'Selecione um paciente para visualizar os dados.')}</p>
+      </div>
+      <div class="professional-quick-actions">
+        ${renderUserSelect(state.selectedUserId)}
+        <a class="breathing-card breathing-card--compact" href="#/historico">
+          <span>Ver</span>
+          <strong>Histórico completo</strong>
+        </a>
+      </div>
+    </section>
+    ${renderMetrics()}
+    ${renderCharts(analytics, escapeHtml)}
+    <section class="panel">
+      <div class="panel-heading">
+        <div><p class="quiet-label">Evolução recente</p><h2>Últimos registros de ${escapeHtml(patientName)}</h2></div>
+        <a class="text-link" href="#/historico">Ver todos</a>
+      </div>
+      ${renderEntryList(state.entries.slice(0, 5))}
+    </section>
+  `;
+}
+
+function renderAdminDashboard() {
+  const totalUsers = state.users?.length || 0;
+  const totalProfs = state.professionals?.length || 0;
+  const admins     = state.users?.filter((u) => u.role === 'admin').length || 0;
+  const patients   = state.users?.filter((u) => u.role === 'user').length || 0;
+  return `
+    <section class="admin-overview">
+      <div class="admin-stat"><span>Pacientes</span><strong>${patients}</strong></div>
+      <div class="admin-stat"><span>Profissionais</span><strong>${totalProfs}</strong></div>
+      <div class="admin-stat"><span>Administradores</span><strong>${admins}</strong></div>
+      <div class="admin-stat"><span>Total de contas</span><strong>${totalUsers}</strong></div>
+    </section>
+    <section class="split-grid">
+      <div class="panel">
+        <div class="panel-heading">
+          <div><p class="quiet-label">Acesso rápido</p><h2>Gestão do sistema</h2></div>
+        </div>
+        <ul class="admin-shortcut-list">
+          <li><a href="#/usuarios" class="admin-shortcut">
+            <strong>Usuários e permissões</strong>
+            <span>Promover roles, editar e remover contas</span>
+          </a></li>
+          <li><a href="#/profissionais" class="admin-shortcut">
+            <strong>Profissionais</strong>
+            <span>Gerenciar cadastros e validações de CRP</span>
+          </a></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="panel-heading">
+          <div><p class="quiet-label">Contas recentes</p><h2>Últimas entradas</h2></div>
+          <a class="text-link" href="#/usuarios">Ver todos</a>
+        </div>
+        <div class="compact-list">
+          ${(state.users?.slice(-5).reverse() || []).map((u) => `
+            <article class="list-row">
+              <div>
+                <strong>${escapeHtml(u.preferred_name || u.name)}</strong>
+                <span>${escapeHtml(u.email)}</span>
+              </div>
+              <small class="pill pill--${u.role}">${roleLabel(u.role)}</small>
+            </article>
+          `).join('')}
+        </div>
       </div>
     </section>
   `;
@@ -759,15 +846,25 @@ function renderEntryList(entries) {
 }
 
 function renderProfessionalsPage() {
-  const editing = state.professionals.find((professional) => professional.id === state.editingProfessionalId);
+  if (isProfessional()) {
+    return `
+      <section class="panel">
+        <div class="panel-heading">
+          <div><p class="quiet-label">Equipe</p><h2>Profissionais de saúde mental</h2></div>
+        </div>
+        <p style="color:var(--muted);font-size:0.88rem;margin-bottom:18px;line-height:1.6">
+          Outros profissionais registrados na plataforma. Para alterações de cadastro, contate o administrador.
+        </p>
+        ${renderProfessionalList()}
+      </section>
+    `;
+  }
+  const editing = state.professionals.find((p) => p.id === state.editingProfessionalId);
   return `
     <section class="split-grid">
       <div class="panel">
         <div class="panel-heading">
-          <div>
-            <p class="quiet-label">Cadastro profissional</p>
-            <h2>${editing ? 'Editar profissional' : 'Novo profissional'}</h2>
-          </div>
+          <div><p class="quiet-label">Cadastro profissional</p><h2>${editing ? 'Editar profissional' : 'Novo profissional'}</h2></div>
           ${editing ? '<button class="text-button" type="button" data-action="cancel-professional-edit">Cancelar</button>' : ''}
         </div>
         <form class="form-grid" data-form="professional">
@@ -778,13 +875,9 @@ function renderProfessionalsPage() {
           <button class="primary-button span-2" type="submit">${editing ? 'Salvar edição' : 'Salvar profissional'}</button>
         </form>
       </div>
-
       <div class="panel">
         <div class="panel-heading">
-          <div>
-            <p class="quiet-label">CRP validado</p>
-            <h2>Profissionais cadastrados</h2>
-          </div>
+          <div><p class="quiet-label">CRP validado</p><h2>Profissionais cadastrados</h2></div>
         </div>
         ${renderProfessionalList()}
       </div>
@@ -868,7 +961,7 @@ function renderUserList() {
             <button type="button" data-action="edit-user" data-id="${user.id}">Editar</button>
             ${isAdmin() ? `
               <select data-action="change-role" data-id="${user.id}" class="role-select">
-                <option value="user"     ${user.role === '👤'         ? 'selected' : ''}>Paciente</option>
+                <option value="user"     ${user.role === 'user'         ? 'selected' : ''}>Paciente</option>
                 <option value="professional" ${user.role === 'professional' ? 'selected' : ''}>Profissional</option>
                 <option value="admin"    ${user.role === 'admin'        ? 'selected' : ''}>Admin</option>
               </select>
@@ -882,13 +975,23 @@ function renderUserList() {
 }
 
 function renderProfile() {
+  const profData = isProfessional()
+    ? state.professionals.find((p) => p.email === state.currentUser?.email)
+    : null;
   return `
     <section class="profile-grid">
       <div class="panel profile-card">
-        <div class="avatar">${escapeHtml(firstName().slice(0, 1).toUpperCase())}</div>
+        <div class="avatar avatar--${state.currentUser?.role || 'user'}">${escapeHtml(firstName().slice(0, 1).toUpperCase())}</div>
         <h2>${escapeHtml(state.currentUser?.name || '')}</h2>
         <p>${escapeHtml(state.currentUser?.email || '')}</p>
         <p class="quiet-label">${roleLabel(state.currentUser?.role)}</p>
+        ${profData ? `
+          <div class="profile-badge">
+            <span class="profile-crp">CRP ${escapeHtml(profData.crp)}</span>
+            <span class="pill pill--${profData.verified ? 'professional' : 'user'}">${profData.verified ? 'Validado' : 'Pendente'}</span>
+          </div>
+          <p class="profile-specialty">${escapeHtml(profData.specialty || 'Especialidade não informada')}</p>
+        ` : ''}
       </div>
       <div class="panel">
         <p class="quiet-label">Conta</p>
@@ -961,6 +1064,10 @@ function render() {
 
   if (state.token && !isStaff() && ['profissionais', 'usuarios'].includes(state.route)) {
     setRoute('painel');
+    return;
+  }
+  if (state.token && isProfessional() && state.route === 'usuarios') {
+    setRoute('profissionais');
     return;
   }
 
@@ -1052,7 +1159,7 @@ app.addEventListener('submit', async (event) => {
   try {
     if (['login', 'register'].includes(form.dataset.form)) await handleAuthSubmit(form);
     if (form.dataset.form === 'entry') await handleEntrySubmit(form);
-    if (form.dataset.form === '👤') await handleUserSubmit(form);
+    if (form.dataset.form === 'user') await handleUserSubmit(form);
     if (form.dataset.form === 'professional') await handleProfessionalSubmit(form);
   } catch (error) {
     showMessage(error.message);

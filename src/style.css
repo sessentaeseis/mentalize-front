@@ -1574,3 +1574,134 @@ input[type='range'] {
 
   .topbar-name { display: none; }
 }
+
+/* ── Diferenciação de roles ──────────────────────────────── */
+
+/* Dashboard profissional */
+.dashboard-hero--professional {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.dashboard-hero--professional .quiet-label {
+  color: var(--purple);
+}
+
+.professional-quick-actions {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.breathing-card--compact {
+  min-height: 70px;
+}
+
+/* Dashboard admin */
+.admin-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--line);
+}
+
+.admin-stat {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  background: var(--paper);
+}
+
+.admin-stat span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-stat strong {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--ink);
+}
+
+/* Atalhos admin */
+.admin-shortcut-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-shortcut {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--paper);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--transition);
+}
+
+.admin-shortcut:hover { background: var(--surface); }
+
+.admin-shortcut strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.admin-shortcut span {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Avatar com cor por role */
+.avatar--admin        { background: #fef3c7; color: #92400e; }
+.avatar--professional { background: #d1fae5; color: #065f46; }
+.avatar--user         { background: var(--lilac-soft); color: var(--purple-deep); }
+
+/* Perfil profissional */
+.profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.profile-crp {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.profile-specialty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* Responsivo admin-overview */
+@media (max-width: 1080px) {
+  .admin-overview { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .admin-overview { grid-template-columns: repeat(2, 1fr); }
+  .professional-quick-actions { grid-template-columns: 1fr; }
+}
