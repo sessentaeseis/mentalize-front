@@ -323,10 +323,8 @@ async function loadEntries() {
 
 function navItem(route, label, icon) {
   const active = state.route === route ? ' aria-current="page"' : '';
-  const iconSvg = icon
-    ? `<svg class="nav-icon" aria-hidden="true"><use href="/icons.svg#${icon}"/></svg>`
-    : '';
-  return `<a href="#/${route}"${active}>${iconSvg}<span>${label}</span></a>`;
+  const iconEl = icon ? `<span class="nav-icon" aria-hidden="true">${icon}</span>` : '';
+  return `<a href="#/${route}"${active}>${iconEl}<span>${label}</span></a>`;
 }
 
 function renderBrand() {
@@ -416,13 +414,13 @@ function renderAppLayout() {
       <aside class="sidebar">
         ${renderBrand()}
         <nav class="nav-links" aria-label="Navegação principal">
-          ${navItem('painel', 'Painel', 'home')}
-          ${navItem('check-in', 'Check-in', 'plus-circle')}
-          ${navItem('historico', 'Histórico', 'clock')}
-          ${navItem('materiais', 'Materiais', 'book-open')}
-          ${isStaff() ? navItem('profissionais', 'Profissionais', 'users') : ''}
-          ${isStaff() ? navItem('usuarios', 'Usuários', 'user') : ''}
-          ${navItem('perfil', 'Perfil', 'settings')}
+          ${navItem('painel', 'Painel', '🏠')}
+          ${navItem('check-in', 'Check-in', '➕')}
+          ${navItem('historico', 'Histórico', '🕐')}
+          ${navItem('materiais', 'Materiais', '📖')}
+          ${isStaff() ? navItem('profissionais', 'Profissionais', '👥') : ''}
+          ${isStaff() ? navItem('usuarios', 'Usuários', '👤') : ''}
+          ${navItem('perfil', 'Perfil', '⚙️')}
         </nav>
       </aside>
 
@@ -870,7 +868,7 @@ function renderUserList() {
             <button type="button" data-action="edit-user" data-id="${user.id}">Editar</button>
             ${isAdmin() ? `
               <select data-action="change-role" data-id="${user.id}" class="role-select">
-                <option value="user"     ${user.role === 'user'         ? 'selected' : ''}>Paciente</option>
+                <option value="user"     ${user.role === '👤'         ? 'selected' : ''}>Paciente</option>
                 <option value="professional" ${user.role === 'professional' ? 'selected' : ''}>Profissional</option>
                 <option value="admin"    ${user.role === 'admin'        ? 'selected' : ''}>Admin</option>
               </select>
@@ -1054,7 +1052,7 @@ app.addEventListener('submit', async (event) => {
   try {
     if (['login', 'register'].includes(form.dataset.form)) await handleAuthSubmit(form);
     if (form.dataset.form === 'entry') await handleEntrySubmit(form);
-    if (form.dataset.form === 'user') await handleUserSubmit(form);
+    if (form.dataset.form === '👤') await handleUserSubmit(form);
     if (form.dataset.form === 'professional') await handleProfessionalSubmit(form);
   } catch (error) {
     showMessage(error.message);
