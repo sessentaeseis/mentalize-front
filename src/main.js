@@ -137,6 +137,7 @@ const state = {
   materialsFilter: 'all',
   favorites: new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')),
   activeExerciseId: null,
+  isPremium: localStorage.getItem('premium') === 'true',
 };
 
 const app = document.querySelector('#app');
@@ -898,7 +899,57 @@ function renderProfile() {
           <div><dt>Email</dt><dd>${escapeHtml(state.currentUser?.email || '—')}</dd></div>
           <div><dt>Perfil</dt><dd>${roleLabel(state.currentUser?.role)}</dd></div>
           <div><dt>Sessão</dt><dd>${state.token ? 'Ativa' : 'Inativa'}</dd></div>
+          <div><dt>Plano</dt><dd>${state.isPremium ? 'Premium' : 'Básico'}</dd></div>
         </dl>
+      </div>
+    </section>
+
+    <section class="plans-section">
+      <div class="panel">
+        <p class="quiet-label">Planos</p>
+        <h2>Escolha seu plano</h2>
+        <div class="plans-grid">
+          <article class="plan-card plan-card--basic">
+            <div class="plan-header">
+              <h3>Plano Básico</h3>
+              <span class="plan-price">Gratuito</span>
+            </div>
+            <ul class="plan-features">
+              <li>Registro diário de emoções</li>
+              <li>Registro de intensidade emocional</li>
+              <li>Adição de observações/contexto</li>
+              <li>Histórico dos últimos 30 dias</li>
+              <li>Calendário emocional básico</li>
+              <li>Exercícios guiados básicos</li>
+              <li>Lembretes de registro</li>
+            </ul>
+            <button class="plan-button plan-button--active" type="button" disabled>Plano Atual</button>
+          </article>
+          <article class="plan-card plan-card--premium ${state.isPremium ? 'plan-card--active' : ''}">
+            <div class="plan-header">
+              <h3>Plano Premium</h3>
+              <span class="plan-price">R$ 14,90/mês</span>
+              <small>ou R$ 149,90/ano</small>
+            </div>
+            <ul class="plan-features">
+              <li>Tudo do plano Básico</li>
+              <li>Histórico emocional ilimitado</li>
+              <li>Gráficos de evolução emocional</li>
+              <li>Estatísticas mensais automáticas</li>
+              <li>Identificação de emoções frequentes</li>
+              <li>Relatórios em PDF</li>
+              <li>Recomendações personalizadas</li>
+              <li>Compartilhamento com psicólogos</li>
+              <li>Exercícios guiados exclusivos</li>
+              <li>Acesso antecipado a novas funcionalidades</li>
+              <li>Suporte prioritário</li>
+            </ul>
+            ${state.isPremium
+              ? '<button class="plan-button plan-button--active" type="button" disabled>Plano Ativo</button>'
+              : '<button class="plan-button plan-button--premium" type="button" data-action="activate-premium">Ativar Premium</button>'
+            }
+          </article>
+        </div>
       </div>
     </section>
   `;
@@ -1107,6 +1158,12 @@ app.addEventListener('click', async (event) => {
         state.favorites.add(materialId);
       }
       saveFavorites();
+      render();
+    }
+    if (action === 'activate-premium') {
+      state.isPremium = true;
+      localStorage.setItem('premium', 'true');
+      showMessage('Plano Premium ativado! (Demo)');
       render();
     }
     if (action === 'select-user') {

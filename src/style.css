@@ -1200,6 +1200,123 @@ input[type='range'] {
   font-weight: 700;
 }
 
+.plans-section {
+  margin-top: 24px;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.plan-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  transition: all 0.2s ease;
+}
+
+.plan-card--premium {
+  border-color: var(--purple);
+  position: relative;
+}
+
+.plan-card--premium::before {
+  content: 'Popular';
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.plan-card--active {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+.plan-header {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-header h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.plan-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--purple);
+}
+
+.plan-header small {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.plan-features {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.plan-features li::before {
+  content: '✓';
+  color: var(--success);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.plan-button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plan-button--active {
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.plan-button--premium {
+  background: var(--purple);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.plan-button--premium:hover {
+  background: var(--purple-deep);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
 .toast {
   position: fixed;
   right: 18px;
