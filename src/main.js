@@ -331,7 +331,7 @@ function renderBrand() {
   return `
     <a class="brand" href="#/${state.token ? 'painel' : 'login'}" aria-label="Mentalize">
       <span class="brand-mark">
-        <img src="/logo.svg" alt="" onerror="this.hidden = true" />
+        <img src="/logo.png" alt="Mentalize Logo" onerror="this.hidden = true" />
         <span>M</span>
       </span>
       <span>
